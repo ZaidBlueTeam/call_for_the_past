@@ -1,0 +1,23 @@
+# Roblox place file
+*.rbxlx
+*.rbxl
+
+# Roblox Studio lock files
+*.rbxlx.lock
+*.rbxl.lock
+
+# Roblox-to-Rojo logs
+*.log
+
+# Visual Studio Code settings
+.vscode/
+
+# Rojo project files that might contain sensitive data
+sourceMap.json
+
+# Local configuration files
+config.json
+
+# System files
+.DS_Store
+Thumbs.db
