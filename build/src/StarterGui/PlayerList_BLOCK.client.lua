@@ -1,0 +1,1 @@
+Game.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
