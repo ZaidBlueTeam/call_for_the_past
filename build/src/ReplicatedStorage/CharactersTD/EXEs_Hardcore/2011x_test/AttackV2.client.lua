@@ -450,11 +450,29 @@ local function startCooldown()
 	end)
 end
 
--- Start attack function
+-- In the isAttackInput function, add cooldown check
+local function isAttackInput(input)
+	-- Block all attack inputs if onCooldown
+	if onCooldown then
+		return false
+	end
+
+	return input.UserInputType == Enum.UserInputType.MouseButton1 or
+		input.KeyCode == Enum.KeyCode.F or
+		input.KeyCode == Enum.KeyCode.ButtonR2
+end
+
+-- Update startAttack to double-check cooldown
 local function startAttack()
-	-- Don't allow attack if already attacking or on cooldown
-	if isAttacking or onCooldown then 
-		debugPrint("Attack blocked - already attacking or on cooldown")
+	-- Double check cooldown status
+	if onCooldown then
+		debugPrint("Attack blocked - on cooldown")
+		return
+	end
+
+	-- Don't allow attack if already attacking
+	if isAttacking then 
+		debugPrint("Attack blocked - already attacking")
 		return 
 	end
 
@@ -513,13 +531,6 @@ local function releaseAttack()
 
 	-- Start cooldown
 	startCooldown()
-end
-
--- Check if input is an attack input
-local function isAttackInput(input)
-	return input.UserInputType == Enum.UserInputType.MouseButton1 or
-		input.KeyCode == Enum.KeyCode.F or
-		input.KeyCode == Enum.KeyCode.ButtonR2
 end
 
 -- Auto-release after max hold time

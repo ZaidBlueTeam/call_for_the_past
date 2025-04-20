@@ -30,7 +30,7 @@ local humanoid = char:WaitForChild("Humanoid")
 
 -- Configuration
 local ATTACK_HOLD_MAX = 1.5     -- Max time you can hold attack
-local ATTACK_COOLDOWN = 1.2     -- Cooldown between attacks
+local ATTACK_COOLDOWN = 2     -- Cooldown between attacks
 local LUNGE_SPEED_BOOST = 10    -- Speed boost during lunge
 local LUNGE_DURATION = 0.5      -- How long the lunge lasts
 local FREEZE_TIME_POSITION = 0.3 -- Time position when animation freezes
@@ -53,6 +53,7 @@ local isAttacking = false
 local holdingAttack = false
 local onCooldown = false
 local attackStartTime = 0
+local lastAttackTime = 0
 local animTrack = nil
 local countdownConnection = nil
 local cooldownIndicator = nil
@@ -452,16 +453,31 @@ end
 
 -- Start attack function
 local function startAttack()
-	-- Don't allow attack if already attacking or on cooldown
-	if isAttacking or onCooldown then 
-		debugPrint("Attack blocked - already attacking or on cooldown")
+	-- Double check cooldown status
+	if onCooldown then
+		debugPrint("Attack blocked - on cooldown")
+		return
+	end
+	
+	local currentTime = tick()
+
+	-- Check if enough time has passed since last attack
+	if currentTime - lastAttackTime < ATTACK_COOLDOWN then
+		debugPrint("Attack blocked - cooldown not finished")
+		return
+	end
+
+	-- Don't allow attack if already attacking
+	if isAttacking then 
+		debugPrint("Attack blocked - already attacking")
 		return 
 	end
 
 	-- Set attack state
 	isAttacking = true
 	holdingAttack = true
-	attackStartTime = tick()
+	attackStartTime = currentTime
+	lastAttackTime = currentTime
 
 	debugPrint("Attack started")
 
@@ -517,6 +533,11 @@ end
 
 -- Check if input is an attack input
 local function isAttackInput(input)
+	-- Block all attack inputs if on cooldown
+	if onCooldown then
+		return false
+	end
+	
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or
 		input.KeyCode == Enum.KeyCode.F or
 		input.KeyCode == Enum.KeyCode.ButtonR2
@@ -670,9 +691,51 @@ local function setupCharacterHandling()
 	end
 end
 
+-- After setupCharacterHandling()
+
+-- Add emergency chase music stop on character death
+if humanoid then
+    humanoid.Died:Connect(function()
+        debugPrint("Character died - stopping chase music")
+        stopChaseMusic()
+    end)
+end
+
+-- Add safety monitor for stuck chase music
+spawn(function()
+    while wait(10) do -- Check every 10 seconds
+        if isChaseActive then
+            local shouldStop = false
+            
+            -- Check team
+            if not player.Team or (player.Team.Name ~= "EXE" and player.Team.Name ~= "Survivor") then
+                debugPrint("Safety check: Not on gameplay team but chase music playing")
+                shouldStop = true
+            end
+            
+            -- Check if dead
+            if not humanoid or not humanoid.Parent or humanoid.Health <= 0 then
+                debugPrint("Safety check: Player dead but chase music playing")
+                shouldStop = true
+            end
+            
+            -- Check character exists
+            if not player.Character or not player.Character.Parent then
+                debugPrint("Safety check: No valid character but chase music playing")
+                shouldStop = true
+            end
+            
+            if shouldStop then
+                stopChaseMusic()
+                resetAttackSystem(false) -- Don't preserve chase music
+            end
+        end
+    end
+end)
+
 -- Initialize all the needed monitoring systems
 setupTeamChangeHandling()
-setupRoundResetDetection()
+setupRoundResetDetection() 
 setupCharacterHandling()
 
 -- Add emergency chase music stop on character death

@@ -28,7 +28,7 @@ local humanoid = char:WaitForChild("Humanoid")
 
 -- Configuration
 local ATTACK_HOLD_MAX = 0.1     -- Max time you can hold attack
-local ATTACK_COOLDOWN = 1.1     -- Cooldown between attacks
+local ATTACK_COOLDOWN = 2     -- Cooldown between attacks
 local LUNGE_SPEED_BOOST = 10    -- Speed boost during lunge
 local LUNGE_DURATION = 0.1      -- How long the lunge lasts
 local FREEZE_TIME_POSITION = 0.3 -- Time position when animation freezes
@@ -230,9 +230,15 @@ end
 
 -- Start attack function
 local function startAttack()
-	-- Don't allow attack if already attacking or on cooldown
-	if isAttacking or onCooldown then 
-		debugPrint("Attack blocked - already attacking or on cooldown")
+	-- Double check cooldown status
+	if onCooldown then
+		debugPrint("Attack blocked - on cooldown")
+		return
+	end
+	
+	-- Don't allow attack if already attacking
+	if isAttacking then 
+		debugPrint("Attack blocked - already attacking")
 		return 
 	end
 
@@ -295,6 +301,11 @@ end
 
 -- Check if input is an attack input
 local function isAttackInput(input)
+	-- Block all attack inputs if on cooldown
+	if onCooldown then
+		return false
+	end
+	
 	return input.UserInputType == Enum.UserInputType.MouseButton1 or
 		input.KeyCode == Enum.KeyCode.F or
 		input.KeyCode == Enum.KeyCode.ButtonR2

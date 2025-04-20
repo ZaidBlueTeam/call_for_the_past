@@ -13,6 +13,7 @@ local COOLDOWN_DURATION = 5 -- Cooldown between teleports (in seconds)
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Variables
 local player = Players.LocalPlayer
@@ -409,6 +410,42 @@ local function setupDeathDetection()
 	end)
 end
 
+-- Add round reset detection
+local function setupRoundResetDetection()
+	local roundStatsEvent = ReplicatedStorage:FindFirstChild("RoundStats")
+	if roundStatsEvent then
+		roundStatsEvent.OnClientEvent:Connect(function(data)
+			if typeof(data) == "table" and data.status then
+				local statusText = data.status
+
+				-- If round reset detected
+				if statusText:find("won the round") or 
+				   statusText:find("Round resetting") or
+				   statusText:find("reset") then
+					print("Round reset detected - cleaning up teleport points")
+					cleanupAllMarkers()
+					teleportPoints = {}
+					currentPointIndex = 1
+					cooldownActive = false
+				end
+			end
+		end)
+	end
+end
+
+-- Add team change detection
+local function setupTeamChangeHandler()
+	player:GetPropertyChangedSignal("Team"):Connect(function()
+		if not player.Team or player.Team.Name ~= "EXE" then
+			print("Team changed from EXE - cleaning up teleport points")
+			cleanupAllMarkers()
+			teleportPoints = {}
+			currentPointIndex = 1
+			cooldownActive = false
+		end
+	end)
+end
+
 -- Handle character respawning
 local function onCharacterAdded(newCharacter)
 	character = newCharacter
@@ -498,8 +535,10 @@ task.spawn(function()
 	-- Clean up any existing markers
 	cleanupAllMarkers()
 
-	-- Setup death detection for initial character
+	-- Setup all monitoring systems
 	setupDeathDetection()
+	setupRoundResetDetection()
+	setupTeamChangeHandler()
 
 	-- Show initialization message
 	print("Teleport script loaded! Press X to set points, 1-3 to teleport")

@@ -442,48 +442,57 @@ end
 
 -- Start attack function
 local function startAttack()
-	-- Don't allow attack if already attacking or on cooldown
-	if isAttacking or onCooldown then 
-		debugPrint("Attack blocked - already attacking or on cooldown")
-		return 
-	end
+    local currentTime = tick()
+    
+    -- Check if enough time has passed since last attack
+    if currentTime - lastAttackTime < ATTACK_COOLDOWN then
+        debugPrint("Attack blocked - cooldown not finished")
+        return
+    end
+    
+    -- Don't allow attack if already attacking
+    if isAttacking then 
+        debugPrint("Attack blocked - already attacking")
+        return 
+    end
 
-	-- Set attack state
-	isAttacking = true
-	holdingAttack = true
-	attackStartTime = tick()
+    -- Set attack state
+    isAttacking = true
+    holdingAttack = true
+    attackStartTime = currentTime
+    lastAttackTime = currentTime
 
-	debugPrint("Attack started")
+    debugPrint("Attack started")
 
-	-- Play attack animation
-	if animTrack then
-		animTrack:Stop()
-	end
+    -- Play attack animation
+    if animTrack then
+        animTrack:Stop()
+    end
 
-	animTrack = humanoid:LoadAnimation(attackAnim)
-	animTrack:Play()
+    animTrack = humanoid:LoadAnimation(attackAnim)
+    animTrack:Play()
 
-	-- Lunge effect - temporary speed boost
-	local originalSpeed = humanoid.WalkSpeed
-	humanoid.WalkSpeed = originalSpeed + LUNGE_SPEED_BOOST
+    -- Lunge effect - temporary speed boost
+    local originalSpeed = humanoid.WalkSpeed
+    humanoid.WalkSpeed = originalSpeed + LUNGE_SPEED_BOOST
 
-	-- Restore original speed after lunge duration
-	task.delay(LUNGE_DURATION, function()
-		if humanoid and humanoid.Parent then
-			humanoid.WalkSpeed = originalSpeed
-		end
-	end)
+    -- Restore original speed after lunge duration
+    task.delay(LUNGE_DURATION, function()
+        if humanoid and humanoid.Parent then
+            humanoid.WalkSpeed = originalSpeed
+        end
+    end)
 
-	-- Freeze animation at charging position if still holding
-	task.delay(FREEZE_TIME_POSITION, function()
-		if holdingAttack and animTrack and animTrack.IsPlaying then
-			animTrack.TimePosition = FREEZE_TIME_POSITION
-			animTrack:AdjustSpeed(0)
-		end
-	end)
+    -- Freeze animation at charging position if still holding
+    task.delay(FREEZE_TIME_POSITION, function()
+        if holdingAttack and animTrack and animTrack.IsPlaying then
+            animTrack.TimePosition = FREEZE_TIME_POSITION
+            animTrack:AdjustSpeed(0)
+        end
+    end)
 
-	-- Tell server we started attack
-	AttackEvent:FireServer("Start")
+    -- Tell server we started attack
+    AttackEvent:FireServer("Start")
 end
 
 -- Release attack function - IMPROVED VERSION
@@ -660,9 +669,51 @@ local function setupCharacterHandling()
 	end
 end
 
+-- After setupCharacterHandling()
+
+-- Add emergency chase music stop on character death
+if humanoid then
+    humanoid.Died:Connect(function()
+        debugPrint("Character died - stopping chase music")
+        stopChaseMusic()
+    end)
+end
+
+-- Add safety monitor for stuck chase music
+spawn(function()
+    while wait(10) do -- Check every 10 seconds
+        if isChaseActive then
+            local shouldStop = false
+            
+            -- Check team
+            if not player.Team or (player.Team.Name ~= "EXE" and player.Team.Name ~= "Survivor") then
+                debugPrint("Safety check: Not on gameplay team but chase music playing")
+                shouldStop = true
+            end
+            
+            -- Check if dead
+            if not humanoid or not humanoid.Parent or humanoid.Health <= 0 then
+                debugPrint("Safety check: Player dead but chase music playing")
+                shouldStop = true
+            end
+            
+            -- Check character exists
+            if not player.Character or not player.Character.Parent then
+                debugPrint("Safety check: No valid character but chase music playing")
+                shouldStop = true
+            end
+            
+            if shouldStop then
+                stopChaseMusic()
+                resetAttackSystem(false) -- Don't preserve chase music
+            end
+        end
+    end
+end)
+
 -- Initialize all the needed monitoring systems
 setupTeamChangeHandling()
-setupRoundResetDetection()
+setupRoundResetDetection() 
 setupCharacterHandling()
 
 -- Reset attack system on script load
